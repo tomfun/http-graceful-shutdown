@@ -16,8 +16,17 @@ if (cluster.isMaster) {
     }
   });
   // cluster should wait
-  process.on('SIGTERM', () => console.log('master ignore SIGTERM'));
-  process.on('SIGINT', () => console.log('master ignore SIGINT'));
+  // there is OS/terminal specific: when you press ctr+c in the terminal it sends signal to all process
+  // but in the production signals will not goes throug all subtree
+  function onSignal(signal: string) {
+    console.log(`master ignore ${signal}, proxy to the children`);
+    Object
+      .keys(cluster.workers)
+      .map(k => cluster.workers[k])
+      .forEach(worker => worker.kill(signal));
+  }
+  process.on('SIGTERM', onSignal.bind(this, 'SIGTERM'));
+  process.on('SIGINT', onSignal.bind(this, 'SIGINT'));
 } else {
   // Configure forks as usual, but exit on terminating
   const server = app.listen(PORT_NUMBER, (error: any) => {
