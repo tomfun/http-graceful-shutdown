@@ -1,5 +1,5 @@
 'use strict';
-/// <reference path="./_extra.d.ts" />
+/// <reference path="_extra.d.ts" />
 
 import * as path from 'path';
 import * as cp from 'child_process';
@@ -19,16 +19,22 @@ const cpSpawn = (command: string, args: string[]): Bluebird<cp.ChildProcess> => 
   let wasError = false;
   child.on('error', (e) => wasError = wasError || reject(e) || true);
   // Debug
-  child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
+  // child.stdout.pipe(process.stdout);
+  // child.stderr.pipe(process.stderr);
 });
 
 
 describe('test cluster mode', () => {
   let server: cp.ChildProcess;
   let isUp: boolean;
+  let delay: (multiplier?: number) => Bluebird<void>;
+
   beforeEach(async function() {
-    // this.timeout(this.timeout() * 4);
+    delay = (m = 1) => {
+      return Bluebird.delay(m * this.timeout() / 10);
+    };
+
+    this.timeout(this.timeout() * 2);
     const binPath: string = path.resolve(__dirname, '..', 'example', 'cluster');
     server = await cpSpawn('node', [
       '--require', 'ts-node/register', // for dev mode
@@ -44,7 +50,7 @@ describe('test cluster mode', () => {
 
   it('should exit when idle', async () => {
     server.kill('SIGTERM');
-    await Bluebird.delay(100);
+    await delay();
     assert.equal(isUp, false);
   });
 
@@ -53,31 +59,30 @@ describe('test cluster mode', () => {
     await rp('http://localhost:8080/quick');
     assert.equal(isUp, true);
     server.kill('SIGTERM');
-    await Bluebird.delay(100);
+    await delay();
     assert.equal(isUp, false);
   });
 
   it('should not exit while request', async () => {
-    await rp('http://localhost:8080/quick');
     // ignore connection reset
     rp('http://localhost:8080/slow').catch((): any => null);
     // wait request is accepted
-    await Bluebird.delay(100);
+    await rp('http://localhost:8080/quick');
     assert.equal(isUp, true, 'server must be up and serve request');
     server.kill('SIGTERM');
-    await Bluebird.delay(200);
+    await delay();
     assert.equal(isUp, true, 'request is slow, server still must serve one');
   });
 
   it('should exit after long request', async () => {
-    await rp('http://localhost:8080/quick');
     const slow = rp('http://localhost:8080/slow');
-    await Bluebird.delay(100);
+    // wait request is accepted
+    await rp('http://localhost:8080/quick');
     assert.equal(isUp, true);
     server.kill('SIGTERM');
     const slowResponse = await slow;
-    assert.equal(!!slowResponse.match(/slow/), true);
-    await Bluebird.delay(100);
-    assert.equal(isUp, false);
+    assert.equal(!!slowResponse.match(/slow/), true, 'response should contain "slow" word');
+    await delay();
+    assert.equal(isUp, false, 'server should exit');
   });
 });
