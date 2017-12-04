@@ -18,7 +18,8 @@ const cpSpawn = (command: string, args: string[]): Bluebird<cp.ChildProcess> => 
 describe('test cluster mode', () => {
   let cluster: cp.ChildProcess;
   let isUp: boolean;
-  beforeEach(async () => {
+  beforeEach(async function() {
+    this.timeout(this.timeout() * 4);
     cluster = await cpSpawn('node', [path.resolve(__dirname, '..', 'example', 'cluster')]);
     cluster.on('close', () => isUp = false);
     isUp = true;
