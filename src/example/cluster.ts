@@ -1,6 +1,8 @@
+'use strict';
+
 import app from './express';
 import * as cluster from 'cluster';
-import {GracefulShutdownManager} from '../src/index';
+import {GracefulShutdownManager} from '../src';
 
 const PORT_NUMBER = 8080;
 

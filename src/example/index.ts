@@ -1,4 +1,6 @@
-import {GracefulShutdownManager} from '../src/index';
+'use strict';
+
+import {GracefulShutdownManager} from '../src';
 import app from './express';
 
 const PORT_NUMBER = 8080;

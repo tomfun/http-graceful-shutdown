@@ -12,7 +12,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "_mocha --require ts-node/register tests/*.ts",
+    "test-dev": "_mocha --require ts-node/register tests/*.ts",
+    "test": "mocha build/tests/*.js",
     "prepare": "npm run build"
   },
   "devDependencies": {

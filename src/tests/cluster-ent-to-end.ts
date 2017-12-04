@@ -19,8 +19,8 @@ const cpSpawn = (command: string, args: string[]): Bluebird<cp.ChildProcess> => 
   let wasError = false;
   child.on('error', (e) => wasError = wasError || reject(e) || true);
   // Debug
-  // child.stdout.pipe(process.stdout);
-  // child.stderr.pipe(process.stderr);
+  child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
 });
 
 

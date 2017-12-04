@@ -1,3 +1,4 @@
+'use strict';
 
 import {IncomingMessage, Server, ServerResponse} from 'http';
 import Socket = NodeJS.Socket;
