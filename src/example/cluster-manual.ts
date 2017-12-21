@@ -3,17 +3,30 @@
 import app from './express';
 import * as cluster from 'cluster';
 import {GracefulShutdownManager} from '../src';
+import {setInterval} from "timers";
 
 const PORT_NUMBER = 8080;
 
 if (cluster.isMaster) {
-  let aliveForks = 2;
   cluster.fork();
   cluster.fork();
+  setTimeout(() => {
+    console.log(
+      'cluster size %d',
+      Object.keys(cluster.workers).length
+    );
+  }, 100);
   cluster.on('exit', function (worker, exitCode) {
-    console.log('Worker %d died :(, exitCode is %d', worker.id, exitCode);
+    console.log(
+      'Worker %d died :(, exitCode is %d, cluster size %d',
+      worker.id,
+      exitCode,
+      Object.keys(cluster.workers).length
+    );
+
     // if all workers died, then cluster is exiting
-    if (!--aliveForks) {
+    // it is just speed up exiting
+    if (!Object.keys(cluster.workers).length) {
       process.exit()
     }
   });
@@ -44,12 +57,11 @@ if (cluster.isMaster) {
 
 
   function onProcessInterrupt (signal: string) {
-    console.log('Termination signal is received from OS (' + signal + '), the application will terminate');
-    //noinspection JSIgnoredPromiseFromCall
+    console.log('Termination signal is received (' + signal + '), the application will terminate');
     shutdownManager.terminate(() => {
       console.log('Server is terminated');
       // This is close the fork
-      process.exit(0)
+      process.exit(0);
     });
   }
 }

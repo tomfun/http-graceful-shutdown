@@ -24,23 +24,28 @@ const cpSpawn = (command: string, args: string[]): Bluebird<cp.ChildProcess> => 
 });
 
 
-describe('test cluster mode', () => {
+describe('test cluster mode', function() {
   let server: cp.ChildProcess;
   let isUp: boolean;
+  let waitDown: Bluebird<boolean>;
   let delay: (multiplier?: number) => Bluebird<void>;
 
   beforeEach(async function() {
+    const maxTime = this.timeout();
     delay = (m = 1) => {
-      return Bluebird.delay(m * this.timeout() / 10);
+      return Bluebird.delay(m * maxTime / 10);
     };
 
-    this.timeout(this.timeout() * 2);
-    const binPath: string = path.resolve(__dirname, '..', 'example', 'cluster');
+    this.timeout(maxTime * 2);
+    const binPath: string = path.resolve(__dirname, '..', 'example', 'cluster-mode');
     server = await cpSpawn('node', [
       '--require', 'ts-node/register', // for dev mode
       binPath,
     ]);
-    server.on('close', () => isUp = false);
+    waitDown = new Bluebird<boolean>(resolve =>
+      server.on('close', () => resolve(isUp = false)))
+      .timeout(maxTime / 2);
+
     isUp = true;
   });
 
@@ -50,7 +55,7 @@ describe('test cluster mode', () => {
 
   it('should exit when idle', async () => {
     server.kill('SIGTERM');
-    await delay();
+    await waitDown;
     assert.equal(isUp, false);
   });
 
@@ -59,7 +64,7 @@ describe('test cluster mode', () => {
     await rp('http://localhost:8080/quick');
     assert.equal(isUp, true);
     server.kill('SIGTERM');
-    await delay();
+    await waitDown;
     assert.equal(isUp, false);
   });
 
@@ -82,7 +87,20 @@ describe('test cluster mode', () => {
     server.kill('SIGTERM');
     const slowResponse = await slow;
     assert.equal(!!slowResponse.match(/slow/), true, 'response should contain "slow" word');
-    await delay();
+    await waitDown;
     assert.equal(isUp, false, 'server should exit');
+  });
+
+  it('should not accept new connections after termination start', async () => {
+    rp('http://localhost:8080/slow');
+    // wait request is accepted
+    await rp('http://localhost:8080/quick');
+    assert.equal(isUp, true);
+    server.kill('SIGTERM');
+    await rp('http://localhost:8080/quick')
+      .then(
+        () => assert.fail(`request accepted, but it shouldn't`),
+        () => null
+      );
   });
 });
