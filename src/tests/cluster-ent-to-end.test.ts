@@ -7,20 +7,25 @@ import * as assert from 'assert';
 import * as Bluebird from 'bluebird';
 import * as rp from 'request-promise';
 
-let data = '';
 const cpSpawn = (command: string, args: string[]): Bluebird<cp.ChildProcess> => new Bluebird((resolve, reject) => {
   const child: cp.ChildProcess = cp.spawn(command, args);
-  // assume, when stdout data is came, process is up
-  let called = false;
-  child.stdout.on('data', (d) => {
-    data += d;
-    called = called || resolve(child) || true
-  });
+  // assume, when response is gotten server is up
+  let maxTimes = 20;
+  async function loop() {
+    await Bluebird.delay(100);
+    try {
+      await rp('http://localhost:8080/quick');
+      resolve(child);
+    } catch (e) {
+      maxTimes-- && await loop();
+    }
+  }
+  loop();
   let wasError = false;
   child.on('error', (e) => wasError = wasError || reject(e) || true);
   // Debug
-  // child.stdout.pipe(process.stdout);
-  // child.stderr.pipe(process.stderr);
+  child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
 });
 
 
@@ -29,9 +34,10 @@ describe('test cluster mode', function() {
   let isUp: boolean;
   let waitDown: Bluebird<boolean>;
   let delay: (multiplier?: number) => Bluebird<void>;
+  let maxTime: number;
 
   beforeEach(async function() {
-    const maxTime = this.timeout();
+    maxTime = this.timeout();
     delay = (m = 1) => {
       return Bluebird.delay(m * maxTime / 10);
     };
@@ -70,7 +76,7 @@ describe('test cluster mode', function() {
 
   it('should not exit while request', async () => {
     // ignore connection reset
-    rp('http://localhost:8080/slow').catch((): any => null);
+    rp(`http://localhost:8080/slow?time=${maxTime}`).catch((): any => null);
     // wait request is accepted
     await rp('http://localhost:8080/quick');
     assert.equal(isUp, true, 'server must be up and serve request');
@@ -92,15 +98,21 @@ describe('test cluster mode', function() {
   });
 
   it('should not accept new connections after termination start', async () => {
-    rp('http://localhost:8080/slow');
+    rp(`http://localhost:8080/slow?time=${maxTime / 1.5}`).catch((): any => null);
     // wait request is accepted
     await rp('http://localhost:8080/quick');
     assert.equal(isUp, true);
     server.kill('SIGTERM');
+    // there is no ability to wait SIGTERM signal delivery, so just wait some time
+    await rp('http://localhost:8080/quick', {timeout: maxTime / 5}).catch(() => null);
     await rp('http://localhost:8080/quick')
       .then(
         () => assert.fail(`request accepted, but it shouldn't`),
-        () => null
+        (e) => assert.equal(
+          e && e.error && (e.error.code === 'ECONNRESET' || e.error.code === 'ECONNREFUSED'),
+          true,
+          e
+        )
       );
   });
 });

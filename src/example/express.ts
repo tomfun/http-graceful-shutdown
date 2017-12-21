@@ -11,7 +11,7 @@ app.get('/quick', (req: Request, res: Response): any => {
 });
 
 app.get('/slow', (req: Request, res: Response): any => {
-  setTimeout(() => res.send('slow response'), 1000);
+  setTimeout(() => res.send('slow response'), req.query.time || 1000);
 });
 
 app.get('/progress', (req: Request, res: Response): any => {

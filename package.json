@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc",
     "test-dev": "_mocha --require ts-node/register src/tests/*.test.ts",
-    "test": "mocha build/tests/*.test.js",
+    "test": "mocha --timeout 5000 --slow 1100 build/tests/*.test.js",
     "prepare": "npm run build"
   },
   "devDependencies": {
