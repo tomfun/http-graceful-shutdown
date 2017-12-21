@@ -6,7 +6,8 @@ import {Cluster} from '../src';
 const PORT_NUMBER = 8080;
 
 const cluster = new Cluster({
-  clusterCreationMode: "auto",
+  clusterCreationMode: "create_exactly",
+  clusterSize: 2,
   onWorkerSetup() {
     return app.listen(PORT_NUMBER, (error: any) => {
       if (!error) {
